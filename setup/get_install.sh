@@ -4,6 +4,8 @@
 # setup inbount and local.inbound.conf
 # setup sudoer.d/sning, so no passwd needed for sudo
 # install socat
+# if re-install
+# sudo systemctl stop haraka.service zone-mta.service wildduck.service
 
 BRANCH="${1:-master}"
 

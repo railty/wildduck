@@ -1,0 +1,118 @@
+DEPLOY SETUP
+
+1. Add your ssh key to /home/deploy/.ssh/authorized_keys
+
+2. Clone application code
+$ git clone deploy@mail.abc.com:/var/opt/wildduck.git
+$ git clone deploy@mail.abc.com:/var/opt/zone-mta.git
+$ git clone deploy@mail.abc.com:/var/opt/wildduck-webmail.git
+$ git clone deploy@mail.abc.com:/var/opt/haraka-plugin-wildduck.git
+$ git clone deploy@mail.abc.com:/var/opt/zonemta-wildduck.git
+
+3. After making a change in local copy deploy to server
+$ git push origin master
+(you might need to use -f when pushing first time)
+
+NAMESERVER SETUP
+================
+
+MX
+--
+Add this MX record to the abc.com DNS zone:
+
+abc.com. IN MX 5 mail.abc.com.
+
+SPF
+---
+Add this TXT record to the abc.com DNS zone:
+
+abc.com. IN TXT "v=spf1 a:mail.abc.com a:abc.com ip4:70.53.228.234 ~all"
+
+Or:
+abc.com. IN TXT "v=spf1 a:mail.abc.com ip4:70.53.228.234 ~all"
+abc.com. IN TXT "v=spf1 ip4:70.53.228.234 ~all"
+
+Some explanation:
+SPF is basically a DNS entry (TXT), where you can define,
+which server hosts (a:[HOSTNAME]) or ip address (ip4:[IP_ADDRESS])
+are allowed to send emails.
+So the receiver server (eg. gmail's server) can look up this entry
+and decide if you(as a sender server) is allowed to send emails as
+this email address.
+
+If you are unsure, list more a:, ip4 entries, rather then fewer.
+
+Example:
+company website: awesome.com
+company's email server: mail.awesome.com
+company's reverse dns entry for this email server: mail.awesome.com -> 11.22.33.44
+
+SPF record in this case would be:
+awesome.com. IN TXT "v=spf1 a:mail.awesome.com a:awesome.com ip4:11.22.33.44 ~all"
+
+The following servers can send emails for *@awesome.com email addresses:
+awesome.com (company's website handling server)
+mail.awesome.com (company's mail server)
+11.22.33.44 (company's mail server's ip address)
+
+Please note, that a:mail.awesome.com is the same as ip4:11.22.33.44, so it is
+redundant. But better safe than sorry.
+And in this example, the company's website handling server can also send
+emails and in general it is an outbound only server.
+If a website handles email sending (confirmation emails, contact form, etc).
+
+DKIM
+----
+Add this TXT record to the abc.com DNS zone:
+
+jan2025._domainkey.abc.com. IN TXT "v=DKIM1;k=rsa;p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCq5VqB4yTDUK5IP5/gVGYjNe5fAImhqBNc32vwUfVYm0yuUzCgBL1vmF7PduV7eiIHyZzryNrZ5hOs2C8fMZFZNtE8WMA9B6Pgb2orIpNG2G9zcO6o2L3lbgmW70iyffxCTc0CH9iXfNSCTpMQNC4m4wTo+3sRM2sOSd3IQXsVpwIDAQAB"
+
+The DKIM .json text we added to wildduck server:
+    curl -i -XPOST http://localhost:8080/dkim \
+    -H 'Content-type: application/json' \
+    -d '{"domain":"abc.com","selector":"jan2025","description":"Default DKIM key for abc.com","privateKey":"-----BEGIN PRIVATE KEY-----\nMIICeQIBADANBgkqhkiG9w0BAQEFAASCAmMwggJfAgEAAoGBAKrlWoHjJMNQrkg/\nn+BUZiM17l8AiaGoE1zfa/BR9VibTK5TMKAEvW+YXs925Xt6IgfJnOvI2tnmE6zY\nLx8xkVk20TxYwD0Ho+Bvaisik0bYb3Nw7qjYveVuCZbvSLJ9/EJNzQIf2Jd81IJO\nkxA0LibjBOj7exEzaw5J3chBexWnAgMBAAECgYEApAkGOQqILRnyT9MSaMdaSo3n\nwjTH5u1nuIuUFdb1gxl+Hw4m7FHga4974fOkDkOLCqKRBxmCSAk59XyErpJrif8W\nLhOk5cJoCesKIhy/BPPS/cL/djsRB2D7eQcop0va1dPIzz9wsqUG66T7CiEkh6hU\nf1+jCvfXqldUDvN7Z1ECQQDWRCELR5UYNlQi5a8ruu4vTDAwZgK09rFQbzRZMhWv\nu1xwHF8ohOPsNJJ1DN5O5WnKpbMs9ERUDfAPcRayIBHLAkEAzC6r99woxblORCZ4\n/Wilatlm3F5iuKEo051rw8AI5j0t+/kcf6IWyki7R4vQhLPavheSHsS+plzjshnH\ndtjgFQJBAL5s/EUvEDXdivcc1Irz7l3Aw48wCjXUjY/j1U10csuko6nLvVKgkIRL\n0OIQVr8dquD8VPqd+OAPJwxCQJ58W/MCQQCF0KSluaUDCJIRugEbWyTmJPrzu+wJ\nQp2mKoqA7O8oLbpgY//YahtzkT0kA66x+cmHQZ1jCuBD2abkh16hNjuNAkEAqwsi\nN8XDy/fP6LiFEuNNfawJeFRjKa8/8twhtndXLSU5b+mtwFm3Oq2z0XB6ab+0Warv\n/4C2l+uEQwCLXWPQYQ==\n-----END PRIVATE KEY-----\n"}'
+
+
+Please refer to the manual how to change/delete/update DKIM keys
+via the REST api (with curl on localhost) for the newest version.
+
+List DKIM keys:
+    curl -i http://localhost:8080/dkim
+Delete DKIM:
+    curl -i -XDELETE http://localhost:8080/dkim/59ef21aef255ed1d9d790e81
+
+Move DKIM keys to another machine:
+
+Save the above curl command and dns entry.
+Also copy the following two files too:
+/opt/zone-mta/keys/[MAILDOMAIN]-dkim.cert
+/opt/zone-mta/keys/[MAILDOMAIN]-dkim.pem
+
+pem: private key (guard it well)
+cert: public key
+
+DMARC
+---
+Add this TXT record to the abc.com DNS zone:
+
+_dmarc.abc.com. IN TXT "v=DMARC1; p=reject;"
+
+PTR
+---
+Make sure that your public IP has a PTR record set to mail.abc.com.
+If your hosting provider does not allow you to set PTR records but has
+assigned their own hostname, then edit /etc/zone-mta/pools.toml and replace
+the hostname mail.abc.com with the actual hostname of this server.
+
+
+TL;DR
+-----
+Add the following DNS records to the abc.com DNS zone:
+
+abc.com. IN MX 5 mail.abc.com.
+abc.com. IN TXT "v=spf1 ip4:70.53.228.234 ~all"
+jan2025._domainkey.abc.com. IN TXT "v=DKIM1;k=rsa;p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCq5VqB4yTDUK5IP5/gVGYjNe5fAImhqBNc32vwUfVYm0yuUzCgBL1vmF7PduV7eiIHyZzryNrZ5hOs2C8fMZFZNtE8WMA9B6Pgb2orIpNG2G9zcO6o2L3lbgmW70iyffxCTc0CH9iXfNSCTpMQNC4m4wTo+3sRM2sOSd3IQXsVpwIDAQAB"
+_dmarc.abc.com. IN TXT "v=DMARC1; p=reject;"
+
+
+(this text is also stored to /home/sning/wildduck/setup/abc.com-nameserver.txt)

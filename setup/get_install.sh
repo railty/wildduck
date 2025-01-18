@@ -1,9 +1,14 @@
 #! /bin/bash
 
+# install node and npm, do not use nvm as sudo doesn't work with nvm well, no need to use node from nodesource, so I comment out the node source part from 04_install_keys
+# setup inbount and local.inbound.conf
+# setup sudoer.d/sning, so no passwd needed for sudo
+# install socat
+
 BRANCH="${1:-master}"
 
 # This script downloads all the installation files.
-BASEURL="https://raw.githubusercontent.com/nodemailer/wildduck/$BRANCH/setup/"
+BASEURL="https://raw.githubusercontent.com/railty/wildduck/refs/heads/master/setup/"
 
 ## declare an array
 declare -a arr=(
@@ -32,4 +37,4 @@ do
 done
 
 chmod +x install.sh
-./install.sh
+sudo ./install.sh abc.com mail.abc.com

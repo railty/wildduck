@@ -39,4 +39,5 @@ do
 done
 
 chmod +x install.sh
-sudo ./install.sh abc.com mail.abc.com
+sudo ./install.sh gush.email mail.gush.email
+

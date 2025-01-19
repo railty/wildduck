@@ -1,40 +1,17 @@
 #! /bin/bash
 
-OURNAME=13_install_local_ssl_certs.sh
+OURNAME=13_install_ssl_certs.sh
 
 echo -e "\n-- Executing ${ORANGE}${OURNAME}${NC} subscript --"
 
 #### SSL CERTS ####
 
-# Create certificates directory if it doesn't exist
-mkdir -p /etc/wildduck/certs
-
-# Install mkcert if not already installed
-if ! command -v mkcert &> /dev/null; then
-    if [ -f /etc/debian_version ]; then
-        # Debian/Ubuntu
-        apt-get update
-        apt-get install -y libnss3-tools
-        wget -O /usr/local/bin/mkcert https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-linux-amd64
-        chmod +x /usr/local/bin/mkcert
-    elif [ -f /etc/redhat-release ]; then
-        # CentOS/RHEL
-        yum install -y nss-tools
-        wget -O /usr/local/bin/mkcert https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-linux-amd64
-        chmod +x /usr/local/bin/mkcert
-    else
-        echo "Unsupported distribution. Please install mkcert manually."
-        exit 1
-    fi
-fi
-
-# Install local CA
-mkcert -install
-
-# Generate certificates for the hostname
-mkcert -key-file /etc/wildduck/certs/privkey.pem \
-       -cert-file /etc/wildduck/certs/fullchain.pem \
-       "$HOSTNAME" "*.$HOSTNAME" "localhost" "127.0.0.1"
+# Install acme.sh
+# NOTE: the version 3.0.7 has a bug with Nginx certs, so version is pinned to 3.0.6
+ACME_VERSION="3.0.6"
+wget https://raw.githubusercontent.com/acmesh-official/acme.sh/${ACME_VERSION}/acme.sh
+sh acme.sh --install --auto-upgrade 0
+rm -rf acme.sh
 
 # WildDuck TLS config
 echo 'cert="/etc/wildduck/certs/fullchain.pem"
@@ -48,7 +25,14 @@ echo '#!/bin/bash
 echo "OK"' > /usr/local/bin/reload-services.sh
 chmod +x /usr/local/bin/reload-services.sh
 
-# Update site config
+~/.acme.sh/acme.sh --issue --nginx --server letsencrypt \
+    -d "$HOSTNAME" \
+    --key-file       /etc/wildduck/certs/privkey.pem  \
+    --fullchain-file /etc/wildduck/certs/fullchain.pem \
+    --reloadcmd     "/usr/local/bin/reload-services.sh" \
+    --force || echo "Warning: Failed to generate certificates, using self-signed certs"
+
+# Update site config, make sure ssl is enabled
 echo "server {
     listen 80;
     listen [::]:80;
@@ -94,11 +78,6 @@ echo "server {
         proxy_redirect off;
     }
 }" > "/etc/nginx/sites-available/$HOSTNAME"
-
-# Create symlink if it doesn't exist
-if [ ! -f "/etc/nginx/sites-enabled/$HOSTNAME" ]; then
-    ln -s "/etc/nginx/sites-available/$HOSTNAME" "/etc/nginx/sites-enabled/$HOSTNAME"
-fi
 
 #See issue https://github.com/nodemailer/wildduck/issues/83
 $SYSTEMCTL_PATH start nginx
